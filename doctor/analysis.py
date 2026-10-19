@@ -31,12 +31,29 @@ def norm_words(s):
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s']", " ", s)).strip()
 
 
+# Whisper habits that are not in the audio: a closing phrase hallucinated on a quiet tail, and a loop on a
+# drawn-out sound ("міссссс...") after which the rest of the text is lost
+HALLUC = re.compile(r"[\s,]*(?:субтитр\w*[\s,]+[\w.]+[\s,]+[\w.]+|дякую за перегляд\w*)[\s,.!]*", re.I)
+ASR_LOOP = re.compile(r"(?P<c>\w)(?P=c){7,}")
+
+
+def clean_asr(text, words):
+    """Drop hallucinated closing phrases. Returns (text, words, loop); loop: transcript unusable."""
+    text = HALLUC.sub(" ", text).strip()
+    for i in range(max(0, len(words) - 5), len(words)):
+        if HALLUC.fullmatch(" ".join(w["text"].strip() for w in words[i:])):
+            words = words[:i]
+            break
+    return text, words, bool(ASR_LOOP.search(text))
+
+
 def speech_intervals(y, top_db=35):
     return librosa.effects.split(y, top_db=top_db, frame_length=1024, hop_length=256)
 
 
-def analyse(y, text=None, words=None, asr_text=None):
-    """Measure a mono 24 kHz signal. `asr_text` / `words` come from a prior transcription."""
+def analyse(y, text=None, words=None, asr_text=None, asr_loop=False):
+    """Measure a mono 24 kHz signal. `asr_text` / `words` come from a prior transcription;
+    asr_loop: Whisper got stuck, so its text is not compared with the transcript."""
     r = {"dur_s": round(len(y) / SR, 2)}
     iv = speech_intervals(y)
     if len(iv) == 0:
@@ -59,9 +76,11 @@ def analyse(y, text=None, words=None, asr_text=None):
     r["rolloff_hz"] = int(np.median(roll))
     if asr_text is not None:
         r["asr_text"] = asr_text
-        if text:
+        if asr_loop:
+            r["asr_loop"] = True
+        elif text:
             r["text_wer"] = round(float(jiwer.wer(norm_words(text), norm_words(asr_text) or "—")), 3)
-    t = text or asr_text or ""
+    t = text or ("" if asr_loop else asr_text) or ""
     r["rate"] = round(text_weight(t) / speech, 2) if t else None
     return r
 
@@ -92,6 +111,8 @@ def verdict(r, has_text):
     chk("rate", r.get("rate"), True, "rate_min")
     chk("rate", r.get("rate"), False, "rate_max")
     chk("trail_sil_s", r.get("trail_sil_s"), True, "trail_sil_min")
+    if r.get("asr_loop"):
+        issues.append(("WARN", "asr_loop", None, None, None))
     if has_text:
         chk("text_wer", r.get("text_wer"))
     else:

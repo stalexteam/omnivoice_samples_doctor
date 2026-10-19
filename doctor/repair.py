@@ -29,6 +29,11 @@ def repair(y, text, r, words, denoise=None, denoise_mode="auto"):
     Returns (y, text, notes) where notes are (code, value) pairs for the UI."""
     notes = []
     asr_text = r.get("asr_text")
+    if r.get("asr_loop"):  # Whisper got stuck: its text and word times are unusable
+        if not text:
+            raise ValueError("speech recognition failed on this sample: enter the transcript by hand")
+        asr_text, words = None, None
+        notes.append(("asr_loop", None))
     use_text = text
     if not text:
         if not asr_text:

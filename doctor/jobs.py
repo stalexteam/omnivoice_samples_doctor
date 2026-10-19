@@ -8,7 +8,7 @@ import traceback
 import librosa
 
 from . import sidon
-from .analysis import analyse, verdict
+from .analysis import analyse, clean_asr, verdict
 from .config import SR
 from .models import NotEnoughMemory
 from .repair import repair
@@ -60,11 +60,11 @@ class Worker:
             out = asr({"raw": y16, "sampling_rate": 16000}, return_timestamps="word",
                       generate_kwargs={"language": "ukrainian", "task": "transcribe"}, **kw)
         words = [{"text": c["text"], "start": c["timestamp"][0], "end": c["timestamp"][1]} for c in out["chunks"]]
-        return out["text"].strip(), words
+        return clean_asr(out["text"].strip(), words)
 
     def transcribe(self, sid):
-        text, words = self._asr(self.store.load_audio(sid))
-        self.store.update(sid, asr_text=text, words=words)
+        text, words, loop = self._asr(self.store.load_audio(sid))
+        self.store.update(sid, asr_text=text, words=words, asr_loop=loop)
         self.analyse(sid, asr=False)
 
     def analyse(self, sid, asr=True):
@@ -73,12 +73,13 @@ class Worker:
         note = None
         if asr and m["asr_text"] is None:
             try:
-                m["asr_text"], m["words"] = self._asr(y)
+                m["asr_text"], m["words"], m["asr_loop"] = self._asr(y)
             except NotEnoughMemory as e:
                 note = f"asr skipped: {e}"
-        r = analyse(y, m["text"], asr_text=m["asr_text"])
+        r = analyse(y, m["text"], asr_text=m["asr_text"], asr_loop=m.get("asr_loop", False))
         level, issues = verdict(r, bool(m["text"]))
-        self.store.update(sid, asr_text=m["asr_text"], words=m["words"], analysis=r, verdict=level,
+        self.store.update(sid, asr_text=m["asr_text"], words=m["words"], asr_loop=m.get("asr_loop", False),
+                          analysis=r, verdict=level,
                           issues=issues, analysis_note=note, analysed_text=m["text"])
 
     def repair(self, sid, denoise="auto"):
@@ -95,10 +96,10 @@ class Worker:
         fy, ftext, notes = repair(y, m["text"], m["analysis"], m["words"], den, denoise)
         self.store.write_fixed(sid, fy)
         try:
-            asr_text, _ = self._asr(fy)
+            asr_text, _, loop = self._asr(fy)
         except NotEnoughMemory:
-            asr_text = None
-        r = analyse(fy, ftext, asr_text=asr_text)
+            asr_text, loop = None, False
+        r = analyse(fy, ftext, asr_text=asr_text, asr_loop=loop)
         level, issues = verdict(r, True)
         self.store.update(sid, fixed={"t": time.time(), "text": ftext, "notes": notes, "analysis": r,
                                       "verdict": level, "issues": issues, "denoise": denoise})
