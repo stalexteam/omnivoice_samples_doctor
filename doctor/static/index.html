@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Лікар семплів</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<aside class="side" aria-label="Семпли">
+  <div class="brand">
+    <svg class="pulse" viewBox="0 0 48 20" aria-hidden="true"><path d="M0 11h13l3-7 4 14 4-16 3 9h21"/></svg>
+    <span>Лікар семплів</span>
+  </div>
+  <button id="drop" class="drop" type="button">
+    <span class="drop-t">Додати семпли</span>
+    <span class="drop-s">Перетягніть сюди аудіо й .info або натисніть</span>
+  </button>
+  <input id="file" type="file" multiple accept=".mp3,.wav,.flac,.ogg,.opus,.m4a,.aac,.webm,.info,.json" hidden>
+  <div id="upmsg" class="upmsg" role="status"></div>
+  <ul id="list" class="list"></ul>
+  <details class="settings">
+    <summary>Налаштування</summary>
+    <div class="set-body">
+      <label>Обчислення
+        <select id="s-device"><option value="auto">автоматично</option><option value="cuda">GPU</option><option value="cpu">CPU</option></select>
+      </label>
+      <label>Модель розпізнавання <select id="s-asr"></select></label>
+      <label>Вивантажувати модель після простою, с <input id="s-idle" type="number" min="30" max="86400"></label>
+      <label>Резерв пам'яті, МБ <input id="s-reserve" type="number" min="0" max="65536"></label>
+      <div class="row"><button id="s-save" class="btn pri" type="button">Зберегти</button>
+        <button id="s-unload" class="btn" type="button">Вивантажити моделі</button></div>
+      <p class="fine">Моделі завантажуються на час роботи й вивантажуються після простою. Якщо на крок бракує
+        пам'яті, сервіс вивантажує інші моделі, а якщо й цього мало, пропускає крок і пише про це.</p>
+    </div>
+  </details>
+  <div id="status" class="status"></div>
+</aside>
+<main id="detail" class="detail"></main>
+<script src="/static/app.js"></script>
+</body>
+</html>

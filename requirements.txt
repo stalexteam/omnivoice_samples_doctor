@@ -1,0 +1,12 @@
+# torch / torchaudio: install the build for your GPU first (see README), e.g.
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+flask>=3.0
+waitress>=3.0
+transformers>=4.45,<5
+accelerate
+huggingface_hub
+librosa>=0.10
+soundfile>=0.12
+jiwer>=3.0
+psutil
+numpy
